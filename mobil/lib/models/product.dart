@@ -4,6 +4,7 @@ class Product {
   final double precio;
   final int cantidad;
   final String marca;
+  final String? imagen;
 
   const Product({
     required this.id,
@@ -11,6 +12,7 @@ class Product {
     required this.precio,
     required this.cantidad,
     required this.marca,
+    this.imagen,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class Product {
       precio: double.parse(json['precio'].toString()),
       cantidad: int.parse(json['cantidad'].toString()),
       marca: json['marca']?.toString() ?? '',
+      imagen: json['imagen']?.toString(),
     );
   }
 
@@ -29,6 +32,7 @@ class Product {
       'precio': precio,
       'cantidad': cantidad,
       'marca': marca,
+      'imagen': imagen,
     };
   }
 }

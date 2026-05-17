@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/product.dart';
 import '../viewmodels/product_view_model.dart';
@@ -12,12 +15,15 @@ class ProductPage extends StatefulWidget {
 
 class _ProductPageState extends State<ProductPage> {
   final ProductViewModel _viewModel = ProductViewModel();
+  final ImagePicker _imagePicker = ImagePicker();
 
   final TextEditingController _idCtrl = TextEditingController();
   final TextEditingController _nombreCtrl = TextEditingController();
   final TextEditingController _precioCtrl = TextEditingController();
   final TextEditingController _cantidadCtrl = TextEditingController();
   final TextEditingController _marcaCtrl = TextEditingController();
+  String? _selectedImagePath;
+  String? _currentImageUrl;
 
   @override
   void initState() {
@@ -71,6 +77,43 @@ class _ProductPageState extends State<ProductPage> {
                           keyboardType: TextInputType.number,
                         ),
                         _buildField(_marcaCtrl, 'Marca'),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _pickFromCamera,
+                              icon: const Icon(Icons.camera_alt),
+                              label: const Text('Camara'),
+                            ),
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              onPressed: _pickFromGallery,
+                              icon: const Icon(Icons.photo),
+                              label: const Text('Galeria'),
+                            ),
+                          ],
+                        ),
+                        if (_selectedImagePath != null || _currentImageUrl != null) ...[
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: _selectedImagePath != null
+                                ? Image.file(
+                                    File(_selectedImagePath!),
+                                    height: 120,
+                                    width: 120,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.network(
+                                    _currentImageUrl!,
+                                    height: 120,
+                                    width: 120,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        const Text('Imagen no disponible'),
+                                  ),
+                          ),
+                        ],
                         const SizedBox(height: 8),
                         Wrap(
                           spacing: 8,
@@ -152,6 +195,19 @@ class _ProductPageState extends State<ProductPage> {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        leading: product.imagen != null && product.imagen!.isNotEmpty
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  product.imagen!,
+                  width: 56,
+                  height: 56,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const Icon(Icons.image_not_supported),
+                ),
+              )
+            : const Icon(Icons.inventory_2),
         title: Text('${product.nombre} - ${product.marca}'),
         subtitle: Text(
           'ID: ${product.id} | Precio: ${product.precio.toStringAsFixed(2)} | Cantidad: ${product.cantidad}',
@@ -163,6 +219,9 @@ class _ProductPageState extends State<ProductPage> {
           _precioCtrl.text = product.precio.toString();
           _cantidadCtrl.text = product.cantidad.toString();
           _marcaCtrl.text = product.marca;
+          _selectedImagePath = null;
+          _currentImageUrl = product.imagen;
+          setState(() {});
         },
       ),
     );
@@ -178,6 +237,7 @@ class _ProductPageState extends State<ProductPage> {
         precio: data.precio,
         cantidad: data.cantidad,
         marca: data.marca,
+        imagePath: _selectedImagePath,
       );
       _showMessage('Producto creado');
       _clearForm();
@@ -202,6 +262,7 @@ class _ProductPageState extends State<ProductPage> {
         precio: data.precio,
         cantidad: data.cantidad,
         marca: data.marca,
+        imagePath: _selectedImagePath,
       );
       _showMessage('Producto actualizado');
     } catch (e) {
@@ -250,6 +311,30 @@ class _ProductPageState extends State<ProductPage> {
     _precioCtrl.clear();
     _cantidadCtrl.clear();
     _marcaCtrl.clear();
+    _selectedImagePath = null;
+    _currentImageUrl = null;
+    setState(() {});
+  }
+
+  Future<void> _pickFromCamera() async {
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 95,
+    );
+    if (picked == null) return;
+    _selectedImagePath = picked.path;
+    _currentImageUrl = null;
+    setState(() {});
+  }
+
+  Future<void> _pickFromGallery() async {
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 95,
+    );
+    if (picked == null) return;
+    _selectedImagePath = picked.path;
+    _currentImageUrl = null;
     setState(() {});
   }
 

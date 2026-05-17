@@ -33,6 +33,7 @@ class ProductViewModel extends ChangeNotifier {
     required double precio,
     required int cantidad,
     required String marca,
+    String? imagePath,
   }) async {
     final newProduct = Product(
       id: 0,
@@ -41,7 +42,7 @@ class ProductViewModel extends ChangeNotifier {
       cantidad: cantidad,
       marca: marca,
     );
-    await _apiService.createProduct(newProduct);
+    await _apiService.createProduct(newProduct, imagePath: imagePath);
     await loadProducts();
   }
 
@@ -51,6 +52,7 @@ class ProductViewModel extends ChangeNotifier {
     required double precio,
     required int cantidad,
     required String marca,
+    String? imagePath,
   }) async {
     final editedProduct = Product(
       id: id,
@@ -59,7 +61,7 @@ class ProductViewModel extends ChangeNotifier {
       cantidad: cantidad,
       marca: marca,
     );
-    await _apiService.updateProduct(id, editedProduct);
+    await _apiService.updateProduct(id, editedProduct, imagePath: imagePath);
     await loadProducts();
   }
 
