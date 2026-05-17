@@ -45,13 +45,18 @@ class ProductController
             return;
         }
 
-        $errors = $this->validate($data);
+        $dataWithImage = $this->attachImageToData($data);
+        if ($dataWithImage === null) {
+            return;
+        }
+
+        $errors = $this->validate($dataWithImage);
         if (!empty($errors)) {
             $this->jsonError('Datos inválidos', 422, ['detalles' => $errors]);
             return;
         }
 
-        $newId = $this->productModel->create($data);
+        $newId = $this->productModel->create($dataWithImage);
         $product = $this->productModel->find($newId);
 
         http_response_code(201);
@@ -65,7 +70,8 @@ class ProductController
             return;
         }
 
-        if ($this->productModel->find($productId) === null) {
+        $existingProduct = $this->productModel->find($productId);
+        if ($existingProduct === null) {
             $this->jsonError('Producto no encontrado', 404);
             return;
         }
@@ -75,13 +81,18 @@ class ProductController
             return;
         }
 
-        $errors = $this->validate($data);
+        $dataWithImage = $this->attachImageToData($data, $existingProduct['imagen'] ?? null);
+        if ($dataWithImage === null) {
+            return;
+        }
+
+        $errors = $this->validate($dataWithImage);
         if (!empty($errors)) {
             $this->jsonError('Datos inválidos', 422, ['detalles' => $errors]);
             return;
         }
 
-        $this->productModel->update($productId, $data);
+        $this->productModel->update($productId, $dataWithImage);
         $product = $this->productModel->find($productId);
 
         http_response_code(200);
@@ -119,6 +130,12 @@ class ProductController
      */
     private function requestData(): ?array
     {
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+
+        if (stripos($contentType, 'multipart/form-data') !== false) {
+            return $_POST;
+        }
+
         $body = file_get_contents('php://input');
         $data = json_decode($body ?: '', true);
 
@@ -154,7 +171,112 @@ class ProductController
             $errors[] = 'cantidad es obligatoria y debe ser un entero mayor o igual a 0';
         }
 
+        if (isset($data['imagen']) && $data['imagen'] !== null && !is_string($data['imagen'])) {
+            $errors[] = 'imagen debe ser texto con la ruta del archivo';
+        }
+
         return $errors;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>|null
+     */
+    private function attachImageToData(array $data, ?string $currentImage = null): ?array
+    {
+        $data['imagen'] = $currentImage;
+
+        if (
+            !isset($_FILES['imagen']) ||
+            !is_array($_FILES['imagen']) ||
+            !isset($_FILES['imagen']['error'])
+        ) {
+            return $data;
+        }
+
+        if ((int) $_FILES['imagen']['error'] === UPLOAD_ERR_NO_FILE) {
+            return $data;
+        }
+
+        $imagePath = $this->saveImage($_FILES['imagen']);
+        if ($imagePath === null) {
+            return null;
+        }
+
+        $data['imagen'] = $imagePath;
+        return $data;
+    }
+
+    /**
+     * @param array<string, mixed> $file
+     */
+    private function saveImage(array $file): ?string
+    {
+        $errorCode = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($errorCode !== UPLOAD_ERR_OK) {
+            $this->jsonError('No se pudo subir la imagen', 400);
+            return null;
+        }
+
+        $tmpName = (string) ($file['tmp_name'] ?? '');
+        if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+            $this->jsonError('Archivo de imagen inválido', 400);
+            return null;
+        }
+
+        if (!function_exists('imagewebp')) {
+            $this->jsonError('El servidor no tiene soporte para convertir a WebP', 500);
+            return null;
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo ? finfo_file($finfo, $tmpName) : false;
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+
+        if (!is_string($mimeType)) {
+            $this->jsonError('Formato de imagen no permitido', 422);
+            return null;
+        }
+
+        $imageResource = match ($mimeType) {
+            'image/jpeg' => imagecreatefromjpeg($tmpName),
+            'image/png' => imagecreatefrompng($tmpName),
+            'image/gif' => imagecreatefromgif($tmpName),
+            'image/webp' => function_exists('imagecreatefromwebp') ? imagecreatefromwebp($tmpName) : false,
+            default => false,
+        };
+
+        if ($imageResource === false) {
+            $this->jsonError('Formato de imagen no permitido o archivo corrupto', 422);
+            return null;
+        }
+
+        if (function_exists('imagepalettetotruecolor')) {
+            imagepalettetotruecolor($imageResource);
+        }
+        imagealphablending($imageResource, false);
+        imagesavealpha($imageResource, true);
+
+        $uploadDir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'upload';
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0777, true) && !is_dir($uploadDir)) {
+            imagedestroy($imageResource);
+            $this->jsonError('No se pudo crear la carpeta de uploads', 500);
+            return null;
+        }
+
+        $fileName = 'prod_' . str_replace('.', '', uniqid('', true)) . '.webp';
+        $targetPath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
+
+        if (!imagewebp($imageResource, $targetPath, 75)) {
+            imagedestroy($imageResource);
+            $this->jsonError('No se pudo guardar la imagen', 500);
+            return null;
+        }
+
+        imagedestroy($imageResource);
+        return 'upload/' . $fileName;
     }
 
     /**

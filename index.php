@@ -20,6 +20,7 @@ $router->add('GET', '/api/productos', [$productController, 'index']);
 $router->add('GET', '/api/productos/{id}', [$productController, 'show']);
 $router->add('POST', '/api/productos', [$productController, 'store']);
 $router->add('PUT', '/api/productos/{id}', [$productController, 'update']);
+$router->add('POST', '/api/productos/{id}', [$productController, 'update']);
 $router->add('DELETE', '/api/productos/{id}', [$productController, 'destroy']);
 
 $router->add('GET', '/', function (): void {

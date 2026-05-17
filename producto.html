@@ -57,6 +57,17 @@
                 <label for="marca" class="form-label">Marca</label>
                 <input id="marca" type="text" class="form-control" placeholder="Ej: Dell" />
               </div>
+              <div class="col-12 col-md-6 col-lg-4">
+                <label for="imagen" class="form-label">Imagen</label>
+                <input id="imagen" type="file" class="form-control" accept="image/*" capture="environment" />
+                <div class="form-text">Puedes tomar foto con la cámara del celular.</div>
+              </div>
+              <div class="col-12 col-md-6 col-lg-4 d-flex align-items-end">
+                <div>
+                  <div class="small text-muted mb-1">Vista previa</div>
+                  <img id="previewImagen" src="" alt="Vista previa" class="rounded border" style="width: 100px; height: 100px; object-fit: cover; display: none;" />
+                </div>
+              </div>
             </div>
 
             <div class="d-grid d-sm-flex flex-wrap gap-2 mt-4">
@@ -78,6 +89,7 @@
               <table class="table table-hover table-striped align-middle mb-0">
                 <thead class="table-dark">
                   <tr>
+                    <th>Imagen</th>
                     <th>ID</th>
                     <th>Nombre</th>
                     <th>Precio</th>
@@ -101,8 +113,11 @@
     const $precio = document.getElementById('precio');
     const $cantidad = document.getElementById('cantidad');
     const $marca = document.getElementById('marca');
+    const $imagen = document.getElementById('imagen');
+    const $previewImagen = document.getElementById('previewImagen');
     const $msg = document.getElementById('msg');
     const $tablaBody = document.getElementById('tablaBody');
+    let imagenActual = '';
 
     function setMsg(text, isError = false) {
       $msg.textContent = text;
@@ -115,6 +130,10 @@
       $precio.value = '';
       $cantidad.value = '';
       $marca.value = '';
+      $imagen.value = '';
+      imagenActual = '';
+      $previewImagen.style.display = 'none';
+      $previewImagen.src = '';
     }
 
     function renderRows(productos) {
@@ -122,7 +141,11 @@
       productos.forEach(p => {
         const tr = document.createElement('tr');
         tr.className = 'clickable-row';
+        const imageCell = p.imagen
+          ? `<img src="${p.imagen}" alt="img-${p.id}" class="rounded border" style="width: 60px; height: 60px; object-fit: cover;" />`
+          : '<span class="text-muted">Sin imagen</span>';
         tr.innerHTML = `
+          <td>${imageCell}</td>
           <td>${p.id}</td>
           <td>${p.nombre}</td>
           <td>${p.precio}</td>
@@ -135,18 +158,30 @@
           $precio.value = p.precio;
           $cantidad.value = p.cantidad;
           $marca.value = p.marca;
+          imagenActual = p.imagen || '';
+          $imagen.value = '';
+          if (imagenActual) {
+            $previewImagen.src = imagenActual;
+            $previewImagen.style.display = 'block';
+          } else {
+            $previewImagen.src = '';
+            $previewImagen.style.display = 'none';
+          }
         });
         $tablaBody.appendChild(tr);
       });
     }
 
     function getPayload() {
-      return {
-        nombre: $nombre.value.trim(),
-        precio: Number($precio.value),
-        cantidad: Number($cantidad.value),
-        marca: $marca.value.trim()
-      };
+      const formData = new FormData();
+      formData.append('nombre', $nombre.value.trim());
+      formData.append('precio', Number($precio.value));
+      formData.append('cantidad', Number($cantidad.value));
+      formData.append('marca', $marca.value.trim());
+      if ($imagen.files[0]) {
+        formData.append('imagen', $imagen.files[0]);
+      }
+      return formData;
     }
 
     async function listar() {
@@ -174,6 +209,14 @@
         $precio.value = data.precio;
         $cantidad.value = data.cantidad;
         $marca.value = data.marca;
+        imagenActual = data.imagen || '';
+        if (imagenActual) {
+          $previewImagen.src = imagenActual;
+          $previewImagen.style.display = 'block';
+        } else {
+          $previewImagen.src = '';
+          $previewImagen.style.display = 'none';
+        }
         setMsg('Producto encontrado');
       } catch (err) {
         setMsg(err.message, true);
@@ -185,8 +228,7 @@
       try {
         const res = await fetch(apiBase, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: payload
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'No se pudo crear');
@@ -205,9 +247,8 @@
       const payload = getPayload();
       try {
         const res = await fetch(`${apiBase}/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          method: 'POST',
+          body: payload
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'No se pudo editar');
@@ -242,6 +283,21 @@
     document.getElementById('btnLimpiar').addEventListener('click', () => {
       limpiarFormulario();
       setMsg('Formulario limpio');
+    });
+    $imagen.addEventListener('change', () => {
+      const file = $imagen.files[0];
+      if (!file) {
+        if (imagenActual) {
+          $previewImagen.src = imagenActual;
+          $previewImagen.style.display = 'block';
+        } else {
+          $previewImagen.src = '';
+          $previewImagen.style.display = 'none';
+        }
+        return;
+      }
+      $previewImagen.src = URL.createObjectURL(file);
+      $previewImagen.style.display = 'block';
     });
 
     listar();

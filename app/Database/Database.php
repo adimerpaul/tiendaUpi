@@ -54,8 +54,35 @@ class Database
                 nombre VARCHAR(120) NOT NULL,
                 precio DECIMAL(10,2) NOT NULL,
                 cantidad INTEGER NOT NULL,
-                marca VARCHAR(120) NOT NULL
+                marca VARCHAR(120) NOT NULL,
+                imagen VARCHAR(255) NULL DEFAULT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                deleted_at DATETIME NULL DEFAULT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
         );
+
+        $existingColumnsStmt = $pdo->query('SHOW COLUMNS FROM products');
+        $existingColumnsRaw = $existingColumnsStmt->fetchAll(PDO::FETCH_ASSOC);
+        $existingColumns = array_map(
+            static fn (array $column): string => (string) ($column['Field'] ?? ''),
+            $existingColumnsRaw
+        );
+
+        if (!in_array('created_at', $existingColumns, true)) {
+            $pdo->exec('ALTER TABLE products ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+        }
+
+        if (!in_array('updated_at', $existingColumns, true)) {
+            $pdo->exec('ALTER TABLE products ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+        }
+
+        if (!in_array('deleted_at', $existingColumns, true)) {
+            $pdo->exec('ALTER TABLE products ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL');
+        }
+
+        if (!in_array('imagen', $existingColumns, true)) {
+            $pdo->exec('ALTER TABLE products ADD COLUMN imagen VARCHAR(255) NULL DEFAULT NULL');
+        }
     }
 }

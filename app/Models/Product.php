@@ -21,7 +21,12 @@ class Product
      */
     public function all(): array
     {
-        $stmt = $this->db->query('SELECT id, nombre, precio, cantidad, marca FROM products ORDER BY id ASC');
+        $stmt = $this->db->query(
+            'SELECT id, nombre, precio, cantidad, marca, imagen, created_at, updated_at, deleted_at
+             FROM products
+             WHERE deleted_at IS NULL
+             ORDER BY id ASC'
+        );
         return $stmt->fetchAll();
     }
 
@@ -30,7 +35,11 @@ class Product
      */
     public function find(int $id): ?array
     {
-        $stmt = $this->db->prepare('SELECT id, nombre, precio, cantidad, marca FROM products WHERE id = :id');
+        $stmt = $this->db->prepare(
+            'SELECT id, nombre, precio, cantidad, marca, imagen, created_at, updated_at, deleted_at
+             FROM products
+             WHERE id = :id AND deleted_at IS NULL'
+        );
         $stmt->execute(['id' => $id]);
         $product = $stmt->fetch();
         return $product === false ? null : $product;
@@ -42,14 +51,15 @@ class Product
     public function create(array $data): int
     {
         $stmt = $this->db->prepare(
-            'INSERT INTO products (nombre, precio, cantidad, marca)
-             VALUES (:nombre, :precio, :cantidad, :marca)'
+            'INSERT INTO products (nombre, precio, cantidad, marca, imagen)
+             VALUES (:nombre, :precio, :cantidad, :marca, :imagen)'
         );
         $stmt->execute([
             'nombre' => $data['nombre'],
             'precio' => $data['precio'],
             'cantidad' => $data['cantidad'],
             'marca' => $data['marca'],
+            'imagen' => $data['imagen'] ?? null,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -62,8 +72,8 @@ class Product
     {
         $stmt = $this->db->prepare(
             'UPDATE products
-             SET nombre = :nombre, precio = :precio, cantidad = :cantidad, marca = :marca
-             WHERE id = :id'
+             SET nombre = :nombre, precio = :precio, cantidad = :cantidad, marca = :marca, imagen = :imagen, updated_at = CURRENT_TIMESTAMP
+             WHERE id = :id AND deleted_at IS NULL'
         );
 
         $stmt->execute([
@@ -72,6 +82,7 @@ class Product
             'precio' => $data['precio'],
             'cantidad' => $data['cantidad'],
             'marca' => $data['marca'],
+            'imagen' => $data['imagen'] ?? null,
         ]);
 
         return $stmt->rowCount() > 0;
@@ -79,7 +90,11 @@ class Product
 
     public function delete(int $id): bool
     {
-        $stmt = $this->db->prepare('DELETE FROM products WHERE id = :id');
+        $stmt = $this->db->prepare(
+            'UPDATE products
+             SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+             WHERE id = :id AND deleted_at IS NULL'
+        );
         $stmt->execute(['id' => $id]);
         return $stmt->rowCount() > 0;
     }
